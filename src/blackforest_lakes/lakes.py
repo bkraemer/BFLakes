@@ -36,8 +36,11 @@ _BIAS_CENTER = {
     "latitude": (BLACK_FOREST_BOUNDS["lat_min"] + BLACK_FOREST_BOUNDS["lat_max"]) / 2,
     "longitude": (BLACK_FOREST_BOUNDS["lng_min"] + BLACK_FOREST_BOUNDS["lng_max"]) / 2,
 }
-# Radius in meters that comfortably covers the bounding box from its center.
-BIAS_RADIUS_METERS = 75_000.0
+# Places API (New) Text Search caps locationBias circle radius at 50000m.
+# The Black Forest bounding box's diagonal is larger than that, so this is a
+# soft bias toward the region's center, not full coverage -- each query's
+# text (e.g. "Titisee, Schwarzwald") does the real narrowing.
+BIAS_RADIUS_METERS = 50_000.0
 
 
 @dataclass(frozen=True)
@@ -52,8 +55,20 @@ class LakeTarget:
 LAKE_TARGETS: list[LakeTarget] = [
     LakeTarget("nonnenmattweiher", "Nonnenmattweiher, Schwarzwald"),
     LakeTarget("feldsee", "Feldsee, Feldberg, Schwarzwald"),
-    LakeTarget("titisee", "Titisee, Schwarzwald"),
-    LakeTarget("schluchsee", "Schluchsee, Schwarzwald"),
+    LakeTarget(
+        "titisee",
+        "Titisee lake, Hinterzarten, Schwarzwald",
+        note="Plain 'Titisee, Schwarzwald' only surfaced the town "
+        "(Titisee-Neustadt); this phrasing surfaces the lake itself "
+        "(primaryType=lake).",
+    ),
+    LakeTarget(
+        "schluchsee",
+        "Schluchsee Stausee, Schwarzwald",
+        note="Plain 'Schluchsee, Schwarzwald' returned an untyped locality "
+        "result; 'Stausee' (reservoir) surfaces the lake itself "
+        "(primaryType=lake).",
+    ),
     LakeTarget(
         "windgfaellweiher",
         "Windgfällweiher, Schwarzwald",
