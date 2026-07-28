@@ -1,0 +1,28 @@
+[project]
+name = "blackforest-lakes"
+version = "0.1.0"
+description = "Reproducible pipeline: Google Maps reviews for 14 Black Forest lakes, translated for corpus-linguistic analysis."
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "requests==2.32.3",
+    "python-dotenv==1.0.1",
+    "langdetect==1.0.9",
+    "deepl==1.19.1",
+    "anthropic==0.39.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.3",
+]
+
+[project.scripts]
+bfl = "blackforest_lakes.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

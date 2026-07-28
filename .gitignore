@@ -1,0 +1,22 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Raw API caches and generated outputs are reproducible from the pipeline,
+# not source (the pipeline recreates data/raw/places_search/ and
+# data/raw/place_details/ itself via config.ensure_data_dirs()).
+data/raw/*
+!data/raw/.gitkeep
+data/cache/**
+!data/cache/.gitkeep
+data/logs/**
+!data/logs/.gitkeep
+data/blackforest_lake_reviews.csv
+data/coverage_report.csv
+data/place_id_candidates.csv
+data/request_log.csv
