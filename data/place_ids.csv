@@ -1,0 +1,15 @@
+lake_slug,lake_name_de,place_id,lat,lng,status,note
+nonnenmattweiher,Nonnenmattweiher,ChIJmQmZliKqkUcRorBT8vEcwys,47.7947499,7.799004000000001,confirmed,
+feldsee,Feldsee,ChIJozvES2b5kEcRfnXTRoCro_E,47.870783499999995,8.0331298,confirmed,
+titisee,Titisee,ChIJDYqHYejwkEcRdAZiy7kHLrY,47.8946026,8.1447897,confirmed,"Plain 'Titisee, Schwarzwald' only surfaced the town (Titisee-Neustadt); this phrasing surfaces the lake itself (primaryType=lake)."
+schluchsee,Schluchsee,ChIJ-W1RWkT2kEcRaCvnl0n_xJw,47.818261299999996,8.1519136,confirmed,"Plain 'Schluchsee, Schwarzwald' returned an untyped locality result; 'Stausee' (reservoir) surfaces the lake itself (primaryType=lake)."
+windgfaellweiher,Windgfällweiher,ChIJFzSTuhX3kEcRpt8nQ99FM2I,47.851821099999995,8.1256044,confirmed,Correct spelling is 'Windgfällweiher' (near Schluchsee).
+blindensee,Blindensee,ChIJI7ysbkvdkEcRAhalTelkbL0,48.1240471,8.1737311,confirmed,
+glaswaldsee,Glaswaldsee,ChIJa4RhllUtl0cRuIPtBO3UX6Q,48.426077,8.2614424,confirmed,
+sankenbachsee,Sankenbachsee,ChIJyZTJ684zl0cRwATweB_CpK8,48.4839799,8.338667599999999,confirmed,
+schurmsee,Schurmsee,ChIJS_svOtM6l0cRwjcNwh24Phc,48.6132676,8.3187567,confirmed,
+wildsee,Wildsee,ChIJV2014g4-l0cRwsdMO_Lt0cE,48.718047299999995,8.4588903,confirmed,Bog lake at Kaltenbronn. Distinct from 'Wilder See'.
+wilder_see,Wildsee,ChIJhYriLGwvl0cRNiurP-W2DQc,48.569846899999995,8.239309,confirmed,Cirque lake near Ruhestein in the national park. Distinct from 'Wildsee'.
+grosser_hohlohsee,Großer Hohlohsee,ChIJty3fgLc9l0cRbPxqnG3LWvQ,48.7032999,8.417838099999999,confirmed,Bog pool at Kaltenbronn; may have weak/no Maps presence -> may resolve unresolved.
+mummelsee,Mummelsee,ChIJsZuPUwUml0cR1iiVdVmh6Iw,48.597780099999994,8.2012004,confirmed,
+herrenwieser_see,Herrenwieser See,ChIJNfrEPnsjl0cRQIzroI0Anwc,48.668413,8.295473,confirmed,
