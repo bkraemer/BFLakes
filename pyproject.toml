@@ -9,7 +9,7 @@ dependencies = [
     "python-dotenv==1.0.1",
     "langdetect==1.0.9",
     "deepl==1.19.1",
-    "anthropic==0.39.0",
+    "anthropic==0.69.0",
 ]
 
 [project.optional-dependencies]
