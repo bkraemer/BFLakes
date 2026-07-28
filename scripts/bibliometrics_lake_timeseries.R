@@ -24,7 +24,7 @@
 # Run this locally (needs normal internet access -- OpenAlex is blocked from
 # the sandbox this was written in). Send back lake_bibliometric_timeseries.csv.
 
-install.packages(c("data.table", "jsonlite", "stringr", "ggplot2", "scales"))
+install.packages(c("data.table", "jsonlite", "stringr", "ggplot2", "scales", "httr"))
 
 library(data.table)
 library(jsonlite)
@@ -95,7 +95,19 @@ periods <- data.table(
 periods[, period_end := pmin(period_start + bin_width - 1, end_year)]
 periods[, period_label := paste0(period_start, "–", period_end)]
 
-# ---- OpenAlex helpers (reused from the original script) --------------------
+# ---- OpenAlex helpers -------------------------------------------------------
+#
+# Uses httr rather than base readLines()/file(): base R's URL reader sends a
+# minimal, generic User-Agent with no way to attach one, which public APIs'
+# bot-protection can flag long before any real rate limit is hit -- and on
+# failure it only ever surfaces "HTTP status was 429", never the actual
+# response body, so there's no way to tell a real quota problem from
+# something else. httr fixes both: a proper identifying User-Agent (the
+# mechanism OpenAlex's own docs describe for "polite pool" access), and the
+# real error body printed on failure so we can actually diagnose it.
+
+if (!requireNamespace("httr", quietly = TRUE)) install.packages("httr")
+library(httr)
 
 base_url <- "https://api.openalex.org"
 
@@ -108,34 +120,53 @@ oa_query <- function(...) {
   query
 }
 
-make_url <- function(path, query) {
-  query <- lapply(query, as.character)
-  query_string <- paste(
-    paste0(
-      utils::URLencode(names(query), reserved = TRUE),
-      "=",
-      vapply(query, utils::URLencode, character(1), reserved = TRUE)
-    ),
-    collapse = "&"
+oa_user_agent <- function() {
+  mailto <- Sys.getenv("OPENALEX_MAILTO", unset = "")
+  httr::user_agent(
+    if (nzchar(mailto)) paste0("mailto:", mailto, " (BFLakes bibliometrics)")
+    else "BFLakes bibliometrics script (no contact email set)"
   )
-  paste0(base_url, path, "?", query_string)
 }
 
 oa_get <- function(path, ..., max_tries = 7) {
   query <- oa_query(...)
-  url <- make_url(path, query)
+  url <- paste0(base_url, path)
 
   for (try_i in seq_len(max_tries)) {
-    txt <- tryCatch(
-      paste(readLines(url, warn = FALSE), collapse = "\n"),
+    resp <- tryCatch(
+      httr::GET(url, query = query, oa_user_agent(), httr::timeout(30)),
       error = identity
     )
-    if (!inherits(txt, "error")) {
-      return(fromJSON(txt, simplifyVector = FALSE))
+
+    if (inherits(resp, "error")) {
+      wait <- min(90, 2 ^ try_i + runif(1, 0, 1))
+      message("Connection error: ", conditionMessage(resp), " -- retrying in ", round(wait, 1), "s")
+      Sys.sleep(wait)
+      next
     }
-    wait <- min(90, 2 ^ try_i + runif(1, 0, 1))
-    message("OpenAlex request failed; retrying in ", round(wait, 1), " seconds.")
-    Sys.sleep(wait)
+
+    status <- httr::status_code(resp)
+
+    if (status == 200) {
+      txt <- httr::content(resp, as = "text", encoding = "UTF-8")
+      return(jsonlite::fromJSON(txt, simplifyVector = FALSE))
+    }
+
+    if (status == 429 || status >= 500) {
+      body <- tryCatch(httr::content(resp, as = "text", encoding = "UTF-8"), error = function(e) "")
+      retry_after <- suppressWarnings(as.numeric(httr::headers(resp)[["retry-after"]]))
+      wait <- if (!is.na(retry_after)) retry_after else min(90, 2 ^ try_i + runif(1, 0, 5))
+      message(
+        "HTTP ", status, " (attempt ", try_i, "/", max_tries, "). Body: ",
+        substr(body, 1, 300), " -- retrying in ", round(wait, 1), "s"
+      )
+      Sys.sleep(wait)
+      next
+    }
+
+    # Non-retryable 4xx: fail loudly and immediately, with the real response body.
+    body <- tryCatch(httr::content(resp, as = "text", encoding = "UTF-8"), error = function(e) "")
+    stop("OpenAlex request failed with HTTP ", status, ": ", body, "\nURL: ", url)
   }
   stop("OpenAlex request failed after ", max_tries, " tries: ", url)
 }
@@ -165,38 +196,54 @@ all_lakes <- rbindlist(list(
   comparison_lakes[, group := "Comparison lake"]
 ))
 
-if (file.exists(cache_file)) {
-  message("Using cached counts: ", cache_file)
-  raw_results <- readRDS(cache_file)
+# Incremental, resumable: saves after every single query, and skips any
+# (lake, period) pair already present in the cache on a rerun. If the script
+# dies partway through (network hiccup, rate limit, anything), rerunning it
+# picks up exactly where it left off instead of losing all prior progress.
+
+jobs <- CJ(lake_i = seq_len(nrow(all_lakes)), period_i = seq_len(nrow(periods)))
+
+raw_results <- if (file.exists(cache_file)) {
+  message("Resuming from cached counts: ", cache_file)
+  readRDS(cache_file)
 } else {
-  jobs <- CJ(lake_i = seq_len(nrow(all_lakes)), period_i = seq_len(nrow(periods)))
+  data.table(
+    lake = character(), group = character(),
+    period_start = integer(), period_end = integer(), period_label = character(),
+    n_papers = integer()
+  )
+}
 
-  raw_results <- rbindlist(lapply(seq_len(nrow(jobs)), function(j) {
-    li <- jobs$lake_i[j]
-    pi <- jobs$period_i[j]
+for (j in seq_len(nrow(jobs))) {
+  li <- jobs$lake_i[j]
+  pi <- jobs$period_i[j]
 
-    expr <- all_lakes$search_name[li]
-    if (!is.na(all_lakes$qualifier[li])) {
-      expr <- paste0(expr, " AND (", all_lakes$qualifier[li], ")")
-    }
+  already_done <- raw_results[
+    lake == all_lakes$lake[li] & period_start == periods$period_start[pi], .N
+  ] > 0
+  if (already_done) next
 
-    message(
-      all_lakes$lake[li], " / ", periods$period_label[pi],
-      " (", j, "/", nrow(jobs), ")"
-    )
+  expr <- all_lakes$search_name[li]
+  if (!is.na(all_lakes$qualifier[li])) {
+    expr <- paste0(expr, " AND (", all_lakes$qualifier[li], ")")
+  }
 
-    n <- count_works(expr, periods$period_start[pi], periods$period_end[pi])
-    Sys.sleep(0.15)
+  message(
+    all_lakes$lake[li], " / ", periods$period_label[pi],
+    " (", j, "/", nrow(jobs), ")"
+  )
 
-    data.table(
-      lake = all_lakes$lake[li],
-      group = all_lakes$group[li],
-      period_start = periods$period_start[pi],
-      period_end = periods$period_end[pi],
-      period_label = periods$period_label[pi],
-      n_papers = n
-    )
-  }))
+  n <- count_works(expr, periods$period_start[pi], periods$period_end[pi])
+  Sys.sleep(0.15)
+
+  raw_results <- rbindlist(list(raw_results, data.table(
+    lake = all_lakes$lake[li],
+    group = all_lakes$group[li],
+    period_start = periods$period_start[pi],
+    period_end = periods$period_end[pi],
+    period_label = periods$period_label[pi],
+    n_papers = n
+  )))
 
   saveRDS(raw_results, cache_file)
 }
